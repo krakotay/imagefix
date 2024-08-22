@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider';
-import { useDropzone } from 'react-dropzone';
 import { clamp } from 'lodash';
 import { RemoveScroll } from 'react-remove-scroll';
 
@@ -16,6 +15,8 @@ export default function App() {
   const containerRef = useRef(null);
   const windowRef = useRef(null);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [isDragActiveOne, setIsDragActiveOne] = useState(false);
+  const [isDragActiveTwo, setIsDragActiveTwo] = useState(false);
 
   const updateWindowSize = () => {
     if (windowRef.current) {
@@ -43,27 +44,56 @@ export default function App() {
     return `${(size / Math.pow(1024, i)).toFixed(2)} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
   };
 
-  const onDrop = (acceptedFiles, setImage, setImageInfo) => {
-    const file = acceptedFiles[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImage(reader.result);
-      setImageInfo({ name: file.name, size: formatFileSize(file.size) });
-    };
-    reader.readAsDataURL(file);
+  const handleDrop = async (event, setImage, setImageInfo, setIsDragActive) => {
+    event.preventDefault();
+    setIsDragActive(false);
+
+    const items = event.dataTransfer.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const file = items[i].getAsFile();
+          if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              setImage(e.target.result);
+              setImageInfo({ name: file.name, size: formatFileSize(file.size) });
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      }
+    }
   };
 
-  const { getRootProps: getRootPropsOne, getInputProps: getInputPropsOne } = useDropzone({
-    onDrop: (acceptedFiles) => onDrop(acceptedFiles, setImageOne, setImageOneInfo),
-    accept: 'image/jpeg, image/png, image/gif, image/webp',
-    multiple: false,
-  });
+  const handleDragOver = (event, setIsDragActive) => {
+    event.preventDefault();
+    setIsDragActive(true);
+  };
 
-  const { getRootProps: getRootPropsTwo, getInputProps: getInputPropsTwo } = useDropzone({
-    onDrop: (acceptedFiles) => onDrop(acceptedFiles, setImageTwo, setImageTwoInfo),
-    accept: 'image/jpeg, image/png, image/gif, image/webp',
-    multiple: false,
-  });
+  const handleDragLeave = (setIsDragActive) => {
+    setIsDragActive(false);
+  };
+
+  const handleClick = (setImage, setImageInfo) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImage(e.target.result);
+          setImageInfo({ name: file.name, size: formatFileSize(file.size) });
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
 
   const handleWheel = useCallback((event) => {
     event.preventDefault();
@@ -122,19 +152,71 @@ export default function App() {
     };
   }, [handleKeyDown, handleKeyUp]);
 
+
+
+
+  function resetPic() {
+    setPosition({ x: 0, y: 0 });
+    setScale(1)
+  }
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div {...getRootPropsOne()} style={{ width: '48%', height: '30px', border: '2px dashed #ccc', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <input {...getInputPropsOne()} />
+        <div
+          onDrop={(e) => handleDrop(e, setImageOne, setImageOneInfo, setIsDragActiveOne)}
+          onDragOver={(e) => handleDragOver(e, setIsDragActiveOne)}
+          onDragLeave={() => handleDragLeave(setIsDragActiveOne)}
+          onClick={() => handleClick(setImageOne, setImageOneInfo)}
+          style={{
+            width: '48%',
+            height: '30px',
+            border: '2px dashed #ccc',
+            borderRadius: '10px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: isDragActiveOne ? '#e6f7ff' : 'transparent',
+            transition: 'background-color 0.3s',
+            cursor: 'pointer',
+            userSelect : "none"
+          }}
+        >
           {imageOneInfo ? (
             <p>{imageOneInfo.name} ({imageOneInfo.size})</p>
           ) : (
             <p>Drag & drop Image One here, or click to select</p>
           )}
         </div>
-        <div {...getRootPropsTwo()} style={{ width: '48%', height: '30px', border: '2px dashed #ccc', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <input {...getInputPropsTwo()} />
+        <button onClick={resetPic}
+          style={{
+            border: '2px dashed #ccc',
+            borderRadius: '10px',
+            backgroundColor: isDragActiveOne ? '#e6f7ff' : 'transparent',
+            transition: 'background-color 0.3s',
+            cursor: 'pointer', 
+            userSelect : "none"
+          }}
+
+        >Reset</button>
+        <div
+          onDrop={(e) => handleDrop(e, setImageTwo, setImageTwoInfo, setIsDragActiveTwo)}
+          onDragOver={(e) => handleDragOver(e, setIsDragActiveTwo)}
+          onDragLeave={() => handleDragLeave(setIsDragActiveTwo)}
+          onClick={() => handleClick(setImageTwo, setImageTwoInfo)}
+          style={{
+            width: '48%',
+            height: '30px',
+            border: '2px dashed #ccc',
+            borderRadius: '10px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: isDragActiveTwo ? '#e6f7ff' : 'transparent',
+            transition: 'background-color 0.3s',
+            cursor: 'pointer',
+            userSelect : "none"
+          }}
+        >
           {imageTwoInfo ? (
             <p>{imageTwoInfo.name} ({imageTwoInfo.size})</p>
           ) : (
@@ -143,10 +225,11 @@ export default function App() {
         </div>
       </div>
 
+
       {imageOne && imageTwo && (
-        <div 
+        <div
           ref={windowRef}
-          style={{ 
+          style={{
             width: windowSize.width,
             height: windowSize.height,
             margin: '0 auto',
@@ -157,14 +240,14 @@ export default function App() {
           }}
         >
           <RemoveScroll>
-            <div 
-              ref={containerRef} 
-              onWheel={handleWheel} 
-              onMouseDown={handleMouseDown} 
-              
-              style={{ 
-                width: '100%', 
-                height: '100%', 
+            <div
+              ref={containerRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+
+              style={{
+                width: '100%',
+                height: '100%',
                 position: 'absolute',
                 cursor: isDragging ? 'grabbing' : 'grab',
                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -173,13 +256,13 @@ export default function App() {
             >
               <ReactCompareSlider
                 itemOne={<ReactCompareSliderImage src={imageOne} alt="Image one" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />}
-                itemTwo={<ReactCompareSliderImage  src={imageTwo} alt="Image two" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />}
+                itemTwo={<ReactCompareSliderImage src={imageTwo} alt="Image two" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />}
                 onPointerDown={(ev) => {
                   if (sliderEnabled) {
                     ev.preventDefault();
                   }
                 }}
-        
+
                 style={{ width: '100%', height: '100%', pointerEvents: sliderEnabled ? 'auto' : 'none' }}
               />
             </div>
